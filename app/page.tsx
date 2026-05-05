@@ -886,7 +886,7 @@ function AuthScreen({ authMode, setAuthMode, onLogin, onRegister, loading, error
             color: "#fff", fontSize: 14, fontWeight: 600,
             opacity: (loading || !username || !password) ? 0.6 : 1, transition: "all 0.15s",
           }}>
-            {loading ? "Working…" : authMode === "register" ? "Create Account & Generate Keys" : "Sign In"}
+            {loading ? "Working…" : authMode === "register" ? "Create Account" : "Sign In"}
           </button>
 
           {authMode === "register" && (
