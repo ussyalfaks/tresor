@@ -542,7 +542,7 @@ export default function WhisperBox() {
       <div style={{ width: 280, background: "#0f0e1a", borderRight: "1px solid #1e1d2e", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #1e1d2e" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-            <div style={{ width: 28, height: 28, background: "linear-gradient(135deg,#7c3aed,#4f46e5)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>🔐</div>
+            <img src="/tresor1.png" alt="Tresor" style={{ width: 28, height: 28, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
             <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "'DM Mono', monospace", color: "#c4b5fd" }}>Tresor</span>
             <div style={{ marginLeft: "auto", width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} title="E2EE Active" />
           </div>
