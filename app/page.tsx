@@ -42,7 +42,6 @@ async function wrapPrivateKey(privKey: CryptoKey, password: string): Promise<{ w
   const wrapKey = await deriveWrappingKey(password, salt);
   const pkcs8   = await subtle.exportKey("pkcs8", privKey);
   const ct      = await subtle.encrypt({ name: "AES-GCM", iv }, wrapKey, pkcs8);
-  // prepend iv so unwrap can read it back
   const blob = new Uint8Array(12 + ct.byteLength);
   blob.set(iv, 0);
   blob.set(new Uint8Array(ct), 12);
@@ -233,9 +232,40 @@ function Avatar({ name, size = 36 }: { name: string | null; size?: number }) {
   );
 }
 
+// ─── Theme CSS ────────────────────────────────────────────────────────────────
+
+const THEME_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bd2); border-radius: 4px; }
+  input, textarea { outline: none; }
+  button { cursor: pointer; border: none; background: none; }
+  [data-theme="dark"] {
+    --bg: #0a0a0f; --surface: #0f0e1a; --elevated: #1a1830;
+    --bd: #1e1d2e; --bd2: #2a2840;
+    --txt: #e8e6f0; --txt2: #5b5880; --txt3: #3d3b58;
+    --accent: #7c3aed; --accent2: #c4b5fd;
+    --msg-other: #1a1830; --msg-other-bd: #2a2840;
+    --err-bg: #1a0f0f; --err-bd: #3d1515; --status-bg: #120f1a;
+    --badge-bg: #1a1030;
+  }
+  [data-theme="light"] {
+    --bg: #f0eeff; --surface: #ffffff; --elevated: #ede9ff;
+    --bd: #ddd9f0; --bd2: #c8c4e0;
+    --txt: #1a1830; --txt2: #6b6890; --txt3: #a0a0c0;
+    --accent: #7c3aed; --accent2: #7c3aed;
+    --msg-other: #ede9ff; --msg-other-bd: #c8c4e0;
+    --err-bg: #fff0f0; --err-bd: #ffd0d0; --status-bg: #f5f0ff;
+    --badge-bg: #e8e4ff;
+  }
+`;
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function WhisperBox() {
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [screen, setScreen] = useState<"auth" | "app">("auth");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [token, setToken] = useState<string | null>(null);
@@ -256,7 +286,6 @@ export default function WhisperBox() {
   const wsRef = useRef<WebSocket | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Refs for stable closures in WS handler
   const tokenRef = useRef<string | null>(null);
   const refreshTokenRef = useRef<string | null>(null);
   const activeConvRef = useRef<ActiveConv | null>(null);
@@ -273,6 +302,8 @@ export default function WhisperBox() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  function toggleTheme() { setTheme(t => t === "dark" ? "light" : "dark"); }
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
 
@@ -464,7 +495,7 @@ export default function WhisperBox() {
     if (!token || !activeConv || !privateKey || !currentUser) return;
     try {
       const res = await apiCall(`/conversations/${activeConv.userId}/messages`, "GET", null, token);
-      const msgs = [...((res as unknown as ApiMessage[]) || [])].reverse(); // newest-first → oldest-first
+      const msgs = [...((res as unknown as ApiMessage[]) || [])].reverse();
       const decrypted = await Promise.all(msgs.map(async (m): Promise<Message> => {
         try {
           const keyToUse = m.from_user_id === currentUser.id ? m.payload.encryptedKeyForSelf : m.payload.encryptedKey;
@@ -523,45 +554,53 @@ export default function WhisperBox() {
       loading={loading}
       error={error}
       status={status}
+      theme={theme}
+      onToggleTheme={toggleTheme}
     />
   );
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "#0a0a0f", fontFamily: "'DM Sans', system-ui, sans-serif", color: "#e8e6f0", overflow: "hidden" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #2a2840; border-radius: 4px; }
-        input, textarea { outline: none; }
-        button { cursor: pointer; border: none; background: none; }
-      `}</style>
+    <div data-theme={theme} style={{ display: "flex", height: "100vh", background: "var(--bg)", fontFamily: "'DM Sans', system-ui, sans-serif", color: "var(--txt)", overflow: "hidden" }}>
+      <style>{THEME_CSS}</style>
 
       {/* Sidebar */}
-      <div style={{ width: 280, background: "#0f0e1a", borderRight: "1px solid #1e1d2e", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-        <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid #1e1d2e" }}>
+      <div style={{ width: 280, background: "var(--surface)", borderRight: "1px solid var(--bd)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+        <div style={{ padding: "20px 16px 16px", borderBottom: "1px solid var(--bd)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
             <img src="/tresor1.png" alt="Tresor" style={{ width: 28, height: 28, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
-            <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "'DM Mono', monospace", color: "#c4b5fd" }}>Tresor</span>
-            <div style={{ marginLeft: "auto", width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} title="E2EE Active" />
+            <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "'DM Mono', monospace", color: "var(--accent2)" }}>Tresor</span>
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} title="E2EE Active" />
+              <button
+                onClick={toggleTheme}
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                style={{
+                  width: 28, height: 28, borderRadius: 7,
+                  background: "var(--elevated)", border: "1px solid var(--bd)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 14, flexShrink: 0, transition: "background 0.15s",
+                }}
+              >
+                {theme === "dark" ? "☀️" : "🌙"}
+              </button>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Avatar name={currentUser?.displayName || currentUser?.username || null} size={32} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: "#e8e6f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentUser?.displayName || currentUser?.username}</div>
-              <div style={{ fontSize: 11, color: "#5b5880", fontFamily: "'DM Mono', monospace" }}>end-to-end encrypted</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: "var(--txt)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentUser?.displayName || currentUser?.username}</div>
+              <div style={{ fontSize: 11, color: "var(--txt3)", fontFamily: "'DM Mono', monospace" }}>end-to-end encrypted</div>
             </div>
-            <button onClick={handleLogout} style={{ fontSize: 11, color: "#6b6890", padding: "4px 8px", borderRadius: 6, border: "1px solid #1e1d2e" }}>out</button>
+            <button onClick={handleLogout} style={{ fontSize: 11, color: "var(--txt2)", padding: "4px 8px", borderRadius: 6, border: "1px solid var(--bd)" }}>out</button>
           </div>
         </div>
 
-        <div style={{ display: "flex", borderBottom: "1px solid #1e1d2e" }}>
+        <div style={{ display: "flex", borderBottom: "1px solid var(--bd)" }}>
           {(["convs", "new"] as const).map(v => (
             <button key={v} onClick={() => setSidePanel(v)} style={{
               flex: 1, padding: "10px 0", fontSize: 12, fontWeight: 500,
-              color: sidePanel === v ? "#c4b5fd" : "#5b5880",
-              borderBottom: sidePanel === v ? "2px solid #7c3aed" : "2px solid transparent",
+              color: sidePanel === v ? "var(--accent2)" : "var(--txt2)",
+              borderBottom: sidePanel === v ? "2px solid var(--accent)" : "2px solid transparent",
               transition: "all 0.15s",
             }}>{v === "convs" ? "Chats" : "New Chat"}</button>
           ))}
@@ -570,7 +609,7 @@ export default function WhisperBox() {
         {sidePanel === "convs" ? (
           <div style={{ flex: 1, overflowY: "auto" }}>
             {conversations.length === 0 ? (
-              <div style={{ padding: 24, textAlign: "center", color: "#3d3b58", fontSize: 13 }}>
+              <div style={{ padding: 24, textAlign: "center", color: "var(--txt3)", fontSize: 13 }}>
                 No conversations yet.<br />Start a new chat →
               </div>
             ) : conversations.map(conv => {
@@ -579,16 +618,16 @@ export default function WhisperBox() {
               return (
                 <button key={conv.user_id} onClick={() => openConversation(conv)} style={{
                   display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 16px",
-                  background: isActive ? "#1a1830" : "transparent",
-                  borderLeft: isActive ? "3px solid #7c3aed" : "3px solid transparent",
+                  background: isActive ? "var(--elevated)" : "transparent",
+                  borderLeft: isActive ? "3px solid var(--accent)" : "3px solid transparent",
                   transition: "all 0.1s", textAlign: "left",
                 }}>
                   <Avatar name={name} size={38} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: "#e8e6f0", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--txt)", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <span style={{ fontSize: 9, color: "#7c3aed", fontFamily: "'DM Mono', monospace", background: "#1a1030", padding: "1px 5px", borderRadius: 3 }}>🔒 E2EE</span>
-                      <span style={{ fontSize: 11, color: "#3d3b58" }}>{formatTime(conv.last_message_at)}</span>
+                      <span style={{ fontSize: 9, color: "var(--accent)", fontFamily: "'DM Mono', monospace", background: "var(--badge-bg)", padding: "1px 5px", borderRadius: 3 }}>🔒 E2EE</span>
+                      <span style={{ fontSize: 11, color: "var(--txt3)" }}>{formatTime(conv.last_message_at)}</span>
                     </div>
                   </div>
                 </button>
@@ -597,29 +636,29 @@ export default function WhisperBox() {
           </div>
         ) : (
           <div style={{ flex: 1, padding: 16, overflowY: "auto" }}>
-            <div style={{ fontSize: 12, color: "#5b5880", marginBottom: 12, fontFamily: "'DM Mono', monospace" }}>FIND A USER</div>
+            <div style={{ fontSize: 12, color: "var(--txt2)", marginBottom: 12, fontFamily: "'DM Mono', monospace" }}>FIND A USER</div>
             <input
               value={searchInput}
               onChange={e => { setSearchInput(e.target.value); searchUsers(e.target.value); }}
               placeholder="Search by username…"
-              style={{ width: "100%", padding: "10px 12px", background: "#0a0a0f", border: "1px solid #2a2840", borderRadius: 8, color: "#e8e6f0", fontSize: 13, marginBottom: 10 }}
+              style={{ width: "100%", padding: "10px 12px", background: "var(--bg)", border: "1px solid var(--bd2)", borderRadius: 8, color: "var(--txt)", fontSize: 13, marginBottom: 10 }}
             />
             {error && <div style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{error}</div>}
             {searchResults.map(r => (
               <button key={r.id} onClick={() => startConversation(r)} disabled={loading} style={{
                 display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px",
-                background: "#1a1830", borderRadius: 8, marginBottom: 6, textAlign: "left",
+                background: "var(--elevated)", borderRadius: 8, marginBottom: 6, textAlign: "left",
                 opacity: loading ? 0.6 : 1,
               }}>
                 <Avatar name={r.display_name || r.username} size={32} />
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#e8e6f0" }}>{r.display_name}</div>
-                  <div style={{ fontSize: 11, color: "#5b5880", fontFamily: "'DM Mono', monospace" }}>@{r.username}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--txt)" }}>{r.display_name}</div>
+                  <div style={{ fontSize: 11, color: "var(--txt2)", fontFamily: "'DM Mono', monospace" }}>@{r.username}</div>
                 </div>
               </button>
             ))}
             {searchInput && searchResults.length === 0 && (
-              <div style={{ fontSize: 12, color: "#3d3b58", textAlign: "center", marginTop: 16 }}>No users found</div>
+              <div style={{ fontSize: 12, color: "var(--txt3)", textAlign: "center", marginTop: 16 }}>No users found</div>
             )}
           </div>
         )}
@@ -629,25 +668,25 @@ export default function WhisperBox() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         {activeConv ? (
           <>
-            <div style={{ padding: "14px 20px", background: "#0f0e1a", borderBottom: "1px solid #1e1d2e", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ padding: "14px 20px", background: "var(--surface)", borderBottom: "1px solid var(--bd)", display: "flex", alignItems: "center", gap: 12 }}>
               <Avatar name={activeConv.displayName || activeConv.username} size={38} />
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#e8e6f0" }}>{activeConv.displayName || activeConv.username}</div>
-                <div style={{ fontSize: 11, color: "#7c3aed", fontFamily: "'DM Mono', monospace" }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--txt)" }}>{activeConv.displayName || activeConv.username}</div>
+                <div style={{ fontSize: 11, color: "var(--accent)", fontFamily: "'DM Mono', monospace" }}>
                   🔒 End-to-end encrypted · RSA-OAEP + AES-256-GCM
                 </div>
               </div>
-              <div style={{ marginLeft: "auto", fontSize: 11, color: "#3d3b58", fontFamily: "'DM Mono', monospace" }}>
+              <div style={{ marginLeft: "auto", fontSize: 11, color: "var(--txt3)", fontFamily: "'DM Mono', monospace" }}>
                 @{activeConv.username}
               </div>
             </div>
 
             <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
               {messages.length === 0 && (
-                <div style={{ textAlign: "center", padding: "60px 20px", color: "#3d3b58" }}>
+                <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--txt3)" }}>
                   <div style={{ fontSize: 32, marginBottom: 12 }}>🔐</div>
-                  <div style={{ fontSize: 14, color: "#5b5880", marginBottom: 6 }}>This conversation is end-to-end encrypted</div>
-                  <div style={{ fontSize: 12, color: "#2a2840" }}>Only you and {activeConv.displayName || activeConv.username} can read these messages.</div>
+                  <div style={{ fontSize: 14, color: "var(--txt2)", marginBottom: 6 }}>This conversation is end-to-end encrypted</div>
+                  <div style={{ fontSize: 12, color: "var(--txt3)" }}>Only you and {activeConv.displayName || activeConv.username} can read these messages.</div>
                 </div>
               )}
               {messages.map((m, i) => {
@@ -660,16 +699,16 @@ export default function WhisperBox() {
                         <div style={{
                           padding: "10px 14px",
                           borderRadius: isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                          background: isMine ? "#4f46e5" : "#1a1830",
-                          border: isMine ? "none" : "1px solid #2a2840",
-                          fontSize: 14, color: m.decryptFailed ? "#f87171" : "#e8e6f0",
+                          background: isMine ? "#4f46e5" : "var(--msg-other)",
+                          border: isMine ? "none" : "1px solid var(--msg-other-bd)",
+                          fontSize: 14, color: m.decryptFailed ? "#f87171" : (isMine ? "#ffffff" : "var(--txt)"),
                           lineHeight: 1.5, wordBreak: "break-word",
                         }}>
                           {m.decryptFailed ? "⚠ Unable to decrypt" : (m.plaintext || "…")}
                         </div>
                         <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4, justifyContent: isMine ? "flex-end" : "flex-start" }}>
-                          <span style={{ fontSize: 10, color: "#3d3b58" }}>{formatTime(m.created_at)}</span>
-                          {!m.decryptFailed && <span style={{ fontSize: 10, color: "#7c3aed", fontFamily: "'DM Mono', monospace" }}>🔒 decrypted</span>}
+                          <span style={{ fontSize: 10, color: "var(--txt3)" }}>{formatTime(m.created_at)}</span>
+                          {!m.decryptFailed && <span style={{ fontSize: 10, color: "var(--accent)", fontFamily: "'DM Mono', monospace" }}>🔒 decrypted</span>}
                         </div>
                       </div>
                     </div>
@@ -679,27 +718,27 @@ export default function WhisperBox() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div style={{ padding: "12px 20px", background: "#0f0e1a", borderTop: "1px solid #1e1d2e" }}>
+            <div style={{ padding: "12px 20px", background: "var(--surface)", borderTop: "1px solid var(--bd)" }}>
               {error && <div style={{ fontSize: 12, color: "#f87171", marginBottom: 8 }}>{error}</div>}
               <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-                <div style={{ flex: 1, background: "#0a0a0f", border: "1px solid #2a2840", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 12, color: "#5b5880", flexShrink: 0 }}>🔒</span>
+                <div style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--bd2)", borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--txt2)", flexShrink: 0 }}>🔒</span>
                   <input
                     value={newMsg}
                     onChange={e => setNewMsg(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
                     placeholder="Type an encrypted message…"
-                    style={{ flex: 1, background: "none", border: "none", color: "#e8e6f0", fontSize: 14, fontFamily: "'DM Sans', system-ui, sans-serif" }}
+                    style={{ flex: 1, background: "none", border: "none", color: "var(--txt)", fontSize: 14, fontFamily: "'DM Sans', system-ui, sans-serif" }}
                   />
                 </div>
                 <button onClick={sendMessage} disabled={loading || !newMsg.trim()} style={{
                   width: 42, height: 42, borderRadius: 12,
-                  background: newMsg.trim() ? "#7c3aed" : "#1e1d2e",
+                  background: newMsg.trim() ? "var(--accent)" : "var(--bd)",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 16, flexShrink: 0, transition: "all 0.15s", opacity: loading ? 0.6 : 1,
                 }}>↑</button>
               </div>
-              <div style={{ textAlign: "center", fontSize: 10, color: "#2a2840", marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
+              <div style={{ textAlign: "center", fontSize: 10, color: "var(--txt3)", marginTop: 8, fontFamily: "'DM Mono', monospace" }}>
                 Encrypted with AES-256-GCM · Keys never leave your device
               </div>
             </div>
@@ -707,8 +746,8 @@ export default function WhisperBox() {
         ) : (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
             <div style={{ fontSize: 48 }}>🔐</div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#c4b5fd" }}>Select a conversation</div>
-            <div style={{ fontSize: 13, color: "#3d3b58", textAlign: "center", maxWidth: 300, lineHeight: 1.6 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, color: "var(--accent2)" }}>Select a conversation</div>
+            <div style={{ fontSize: 13, color: "var(--txt3)", textAlign: "center", maxWidth: 300, lineHeight: 1.6 }}>
               Your messages are encrypted end-to-end. Only you and your recipient can read them.
             </div>
             <EncryptionBadge />
@@ -721,17 +760,17 @@ export default function WhisperBox() {
 
 function EncryptionBadge() {
   return (
-    <div style={{ background: "#0f0e1a", border: "1px solid #1e1d2e", borderRadius: 12, padding: "16px 20px", maxWidth: 320 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#7c3aed", fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>ENCRYPTION PROTOCOL</div>
+    <div style={{ background: "var(--surface)", border: "1px solid var(--bd)", borderRadius: 12, padding: "16px 20px", maxWidth: 320 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>ENCRYPTION PROTOCOL</div>
       {[
         ["RSA-OAEP 2048", "Key exchange"],
         ["AES-256-GCM", "Message encryption"],
         ["PBKDF2 + AES-GCM", "Key wrapping"],
         ["WebSocket", "Real-time delivery"],
       ].map(([tech, desc]) => (
-        <div key={tech} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #1e1d2e" }}>
-          <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: "#c4b5fd" }}>{tech}</span>
-          <span style={{ fontSize: 12, color: "#5b5880" }}>{desc}</span>
+        <div key={tech} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--bd)" }}>
+          <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: "var(--accent2)" }}>{tech}</span>
+          <span style={{ fontSize: 12, color: "var(--txt2)" }}>{desc}</span>
         </div>
       ))}
     </div>
@@ -746,9 +785,11 @@ interface AuthScreenProps {
   loading: boolean;
   error: string;
   status: string;
+  theme: "dark" | "light";
+  onToggleTheme: () => void;
 }
 
-function AuthScreen({ authMode, setAuthMode, onLogin, onRegister, loading, error, status }: AuthScreenProps) {
+function AuthScreen({ authMode, setAuthMode, onLogin, onRegister, loading, error, status, theme, onToggleTheme }: AuthScreenProps) {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -774,55 +815,74 @@ function AuthScreen({ authMode, setAuthMode, onLogin, onRegister, loading, error
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0f", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap'); * { box-sizing: border-box; margin: 0; padding: 0; } input { outline: none; }`}</style>
+    <div data-theme={theme} style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', system-ui, sans-serif", position: "relative" }}>
+      <style>{`
+        ${THEME_CSS}
+        input { outline: none; }
+      `}</style>
+
+      {/* Theme toggle — top right */}
+      <button
+        onClick={onToggleTheme}
+        title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        style={{
+          position: "absolute", top: 20, right: 20,
+          width: 36, height: 36, borderRadius: 10,
+          background: "var(--surface)", border: "1px solid var(--bd)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 16, cursor: "pointer", transition: "background 0.15s",
+        }}
+      >
+        {theme === "dark" ? "☀️" : "🌙"}
+      </button>
+
       <div style={{ width: 380 }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <img src="/tresor.png" alt="Tresor" style={{ width: 130, borderRadius: 20, margin: "0 auto 12px", display: "block" }} />
-          <div style={{ fontSize: 13, color: "#5b5880" }}>End-to-end encrypted messaging</div>
+          <img src="/tresor1.png" alt="Tresor" style={{ width: 130, borderRadius: 20, margin: "0 auto 12px", display: "block" }} />
+          <div style={{ fontSize: 13, color: "var(--txt2)" }}>End-to-end encrypted messaging</div>
         </div>
 
-        <div style={{ background: "#0f0e1a", border: "1px solid #1e1d2e", borderRadius: 16, padding: 28 }}>
-          <div style={{ display: "flex", background: "#0a0a0f", borderRadius: 10, padding: 3, marginBottom: 24 }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--bd)", borderRadius: 16, padding: 28 }}>
+          <div style={{ display: "flex", background: "var(--bg)", borderRadius: 10, padding: 3, marginBottom: 24 }}>
             {(["login", "register"] as const).map(v => (
               <button key={v} onClick={() => setAuthMode(v)} style={{
                 flex: 1, padding: "8px 0", fontSize: 13, fontWeight: 500, borderRadius: 8,
-                background: authMode === v ? "#7c3aed" : "transparent",
-                color: authMode === v ? "#fff" : "#5b5880", transition: "all 0.15s",
+                background: authMode === v ? "var(--accent)" : "transparent",
+                color: authMode === v ? "#fff" : "var(--txt2)", transition: "all 0.15s",
               }}>{v === "login" ? "Sign In" : "Register"}</button>
             ))}
           </div>
 
           {authMode === "register" && (
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, color: "#5b5880", display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace" }}>DISPLAY NAME</label>
+              <label style={{ fontSize: 12, color: "var(--txt2)", display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace" }}>DISPLAY NAME</label>
               <input value={displayName} onChange={e => setDisplayName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleSubmit()}
                 placeholder="Your Name"
-                style={{ width: "100%", padding: "11px 14px", background: "#0a0a0f", border: "1px solid #2a2840", borderRadius: 10, color: "#e8e6f0", fontSize: 14 }} />
+                style={{ width: "100%", padding: "11px 14px", background: "var(--bg)", border: "1px solid var(--bd2)", borderRadius: 10, color: "var(--txt)", fontSize: 14 }} />
             </div>
           )}
 
           <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 12, color: "#5b5880", display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace" }}>USERNAME</label>
+            <label style={{ fontSize: 12, color: "var(--txt2)", display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace" }}>USERNAME</label>
             <input value={username} onChange={e => setUsername(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSubmit()}
               placeholder="your_username"
-              style={{ width: "100%", padding: "11px 14px", background: "#0a0a0f", border: "1px solid #2a2840", borderRadius: 10, color: "#e8e6f0", fontSize: 14, fontFamily: "'DM Mono', monospace" }} />
+              style={{ width: "100%", padding: "11px 14px", background: "var(--bg)", border: "1px solid var(--bd2)", borderRadius: 10, color: "var(--txt)", fontSize: 14, fontFamily: "'DM Mono', monospace" }} />
           </div>
           <div style={{ marginBottom: 20 }}>
-            <label style={{ fontSize: 12, color: "#5b5880", display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace" }}>PASSWORD</label>
+            <label style={{ fontSize: 12, color: "var(--txt2)", display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace" }}>PASSWORD</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSubmit()}
               placeholder="••••••••"
-              style={{ width: "100%", padding: "11px 14px", background: "#0a0a0f", border: "1px solid #2a2840", borderRadius: 10, color: "#e8e6f0", fontSize: 14 }} />
+              style={{ width: "100%", padding: "11px 14px", background: "var(--bg)", border: "1px solid var(--bd2)", borderRadius: 10, color: "var(--txt)", fontSize: 14 }} />
           </div>
 
-          {(validationError || error) && <div style={{ fontSize: 13, color: "#f87171", marginBottom: 14, padding: "10px 12px", background: "#1a0f0f", borderRadius: 8, border: "1px solid #3d1515" }}>{validationError || error}</div>}
-          {status && <div style={{ fontSize: 13, color: "#c4b5fd", marginBottom: 14, padding: "10px 12px", background: "#120f1a", borderRadius: 8, border: "1px solid #2a2840", fontFamily: "'DM Mono', monospace" }}>⟳ {status}</div>}
+          {(validationError || error) && <div style={{ fontSize: 13, color: "#f87171", marginBottom: 14, padding: "10px 12px", background: "var(--err-bg)", borderRadius: 8, border: "1px solid var(--err-bd)" }}>{validationError || error}</div>}
+          {status && <div style={{ fontSize: 13, color: "var(--accent2)", marginBottom: 14, padding: "10px 12px", background: "var(--status-bg)", borderRadius: 8, border: "1px solid var(--bd)", fontFamily: "'DM Mono', monospace" }}>⟳ {status}</div>}
 
           <button onClick={handleSubmit} disabled={loading || !username || !password} style={{
-            width: "100%", padding: "12px", background: "#7c3aed", borderRadius: 10,
+            width: "100%", padding: "12px", background: "var(--accent)", borderRadius: 10,
             color: "#fff", fontSize: 14, fontWeight: 600,
             opacity: (loading || !username || !password) ? 0.6 : 1, transition: "all 0.15s",
           }}>
@@ -830,8 +890,8 @@ function AuthScreen({ authMode, setAuthMode, onLogin, onRegister, loading, error
           </button>
 
           {authMode === "register" && (
-            <div style={{ marginTop: 16, padding: 12, background: "#0a0a0f", borderRadius: 8, border: "1px solid #1e1d2e" }}>
-              <div style={{ fontSize: 11, color: "#5b5880", lineHeight: 1.7 }}>
+            <div style={{ marginTop: 16, padding: 12, background: "var(--bg)", borderRadius: 8, border: "1px solid var(--bd)" }}>
+              <div style={{ fontSize: 11, color: "var(--txt2)", lineHeight: 1.7 }}>
                 🔑 RSA-2048 keypair generated locally.<br />
                 Private key is wrapped with AES-KW (PBKDF2) — it cannot be read without your password.
               </div>
@@ -839,7 +899,7 @@ function AuthScreen({ authMode, setAuthMode, onLogin, onRegister, loading, error
           )}
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "#2a2840", fontFamily: "'DM Mono', monospace" }}>
+        <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "var(--txt3)", fontFamily: "'DM Mono', monospace" }}>
           Zero-knowledge · Server sees only ciphertext
         </div>
       </div>
