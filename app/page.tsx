@@ -784,29 +784,9 @@ export default function WhisperBox() {
             <div style={{ fontSize: 13, color: "var(--txt3)", textAlign: "center", maxWidth: 300, lineHeight: 1.6 }}>
               Your messages are encrypted end-to-end. Only you and your recipient can read them.
             </div>
-            <EncryptionBadge />
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function EncryptionBadge() {
-  return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--bd)", borderRadius: 12, padding: "16px 20px", maxWidth: 320 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", fontFamily: "'DM Mono', monospace", marginBottom: 12 }}>ENCRYPTION PROTOCOL</div>
-      {[
-        ["RSA-OAEP 2048", "Key exchange"],
-        ["AES-256-GCM", "Message encryption"],
-        ["PBKDF2 + AES-GCM", "Key wrapping"],
-        ["WebSocket", "Real-time delivery"],
-      ].map(([tech, desc]) => (
-        <div key={tech} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid var(--bd)" }}>
-          <span style={{ fontSize: 12, fontFamily: "'DM Mono', monospace", color: "var(--accent2)" }}>{tech}</span>
-          <span style={{ fontSize: 12, color: "var(--txt2)" }}>{desc}</span>
-        </div>
-      ))}
     </div>
   );
 }
