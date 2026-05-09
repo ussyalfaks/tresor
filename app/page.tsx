@@ -743,7 +743,7 @@ export default function WhisperBox() {
                         </div>
                         <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4, justifyContent: isMine ? "flex-end" : "flex-start" }}>
                           <span style={{ fontSize: 10, color: "var(--txt3)" }}>{formatTime(m.created_at)}</span>
-                          {!m.decryptFailed && <span style={{ fontSize: 10, color: "var(--accent)", fontFamily: "'DM Mono', monospace" }}>🔒 decrypted</span>}
+                          {!m.decryptFailed && <span style={{ fontSize: 10, color: "var(--accent)", fontFamily: "'DM Mono', monospace" }}></span>}
                         </div>
                       </div>
                     </div>
