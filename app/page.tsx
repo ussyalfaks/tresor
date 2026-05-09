@@ -282,9 +282,12 @@ export default function WhisperBox() {
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [sidePanel, setSidePanel] = useState<"convs" | "new">("convs");
+  const [wsConnected, setWsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsReconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsReconnectDelay = useRef(1000);
 
   const tokenRef = useRef<string | null>(null);
   const refreshTokenRef = useRef<string | null>(null);
@@ -376,8 +379,10 @@ export default function WhisperBox() {
 
   function handleLogout() {
     if (pollRef.current) clearInterval(pollRef.current);
+    if (wsReconnectTimer.current) clearTimeout(wsReconnectTimer.current);
     wsRef.current?.close();
     wsRef.current = null;
+    setWsConnected(false);
     setToken(null); setRefreshToken(null); setCurrentUser(null); setPrivateKey(null);
     setScreen("auth"); setConversations([]); setMessages([]); setActiveConv(null);
   }
@@ -426,12 +431,40 @@ export default function WhisperBox() {
 
   useEffect(() => {
     if (screen !== "app" || !token) return;
-    const ws = new WebSocket(`wss://whisperbox.koyeb.app/ws?token=${token}`);
-    wsRef.current = ws;
-    ws.onmessage = (e) => {
-      try { handleWSMessage(JSON.parse(e.data) as Record<string, unknown>); } catch { /* ignore */ }
+    let destroyed = false;
+
+    function connect() {
+      if (destroyed) return;
+      const ws = new WebSocket(`wss://whisperbox.koyeb.app/ws?token=${token}`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        wsReconnectDelay.current = 1000;
+        setWsConnected(true);
+      };
+      ws.onmessage = (e) => {
+        try { handleWSMessage(JSON.parse(e.data) as Record<string, unknown>); } catch { /* ignore */ }
+      };
+      ws.onerror = () => setWsConnected(false);
+      ws.onclose = () => {
+        wsRef.current = null;
+        setWsConnected(false);
+        if (destroyed) return;
+        wsReconnectTimer.current = setTimeout(() => {
+          wsReconnectDelay.current = Math.min(wsReconnectDelay.current * 2, 30000);
+          connect();
+        }, wsReconnectDelay.current);
+      };
+    }
+
+    connect();
+    return () => {
+      destroyed = true;
+      if (wsReconnectTimer.current) clearTimeout(wsReconnectTimer.current);
+      wsRef.current?.close();
+      wsRef.current = null;
+      setWsConnected(false);
     };
-    return () => { ws.close(); wsRef.current = null; };
   }, [screen, token, handleWSMessage]);
 
   // ─── Conversations ─────────────────────────────────────────────────────────
@@ -514,9 +547,10 @@ export default function WhisperBox() {
   useEffect(() => {
     if (!activeConv) return;
     loadMessages();
+    if (wsConnected) return;
     const interval = setInterval(loadMessages, 5000);
     return () => clearInterval(interval);
-  }, [activeConv, loadMessages]);
+  }, [activeConv, loadMessages, wsConnected]);
 
   async function sendMessage() {
     if (!newMsg.trim() || !activeConv || !currentUser || !privateKey) return;
@@ -570,7 +604,7 @@ export default function WhisperBox() {
             <img src="/tresor1.png" alt="Tresor" style={{ width: 28, height: 28, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
             <span style={{ fontSize: 15, fontWeight: 600, fontFamily: "'DM Mono', monospace", color: "var(--accent2)" }}>Tresor</span>
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} title="E2EE Active" />
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: wsConnected ? "#10b981" : "#f59e0b" }} title={wsConnected ? "Connected" : "Reconnecting…"} />
               <button
                 onClick={toggleTheme}
                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
