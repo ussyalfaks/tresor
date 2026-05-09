@@ -482,10 +482,11 @@ export default function WhisperBox() {
   useEffect(() => {
     if (screen === "app") {
       loadConversations();
+      if (wsConnected) return;
       pollRef.current = setInterval(loadConversations, 10000);
       return () => { if (pollRef.current) clearInterval(pollRef.current); };
     }
-  }, [screen, loadConversations]);
+  }, [screen, loadConversations, wsConnected]);
 
   // ─── User search & conversation start ──────────────────────────────────────
 
