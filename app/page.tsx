@@ -708,7 +708,7 @@ export default function WhisperBox() {
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "var(--txt)" }}>{activeConv.displayName || activeConv.username}</div>
                 <div style={{ fontSize: 11, color: "var(--accent)", fontFamily: "'DM Mono', monospace" }}>
-                  🔒 End-to-end encrypted · RSA-OAEP + AES-256-GCM
+                  🔒 End-to-end encrypted
                 </div>
               </div>
               <div style={{ marginLeft: "auto", fontSize: 11, color: "var(--txt3)", fontFamily: "'DM Mono', monospace" }}>
