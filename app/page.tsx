@@ -923,14 +923,6 @@ function AuthScreen({ authMode, setAuthMode, onLogin, onRegister, loading, error
             {loading ? "Working…" : authMode === "register" ? "Create Account" : "Sign In"}
           </button>
 
-          {authMode === "register" && (
-            <div style={{ marginTop: 16, padding: 12, background: "var(--bg)", borderRadius: 8, border: "1px solid var(--bd)" }}>
-              <div style={{ fontSize: 11, color: "var(--txt2)", lineHeight: 1.7 }}>
-                🔑 RSA-2048 keypair generated locally.<br />
-                Private key is wrapped with AES-KW (PBKDF2) — it cannot be read without your password.
-              </div>
-            </div>
-          )}
         </div>
 
         <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: "var(--txt3)", fontFamily: "'DM Mono', monospace" }}>
